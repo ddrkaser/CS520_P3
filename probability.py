@@ -9,8 +9,8 @@ import time
 
 def generate_gridworld(length, width, probability):
     grid = np.random.choice([0,1], length * width, p = [1 - probability, probability]).reshape(length, width)
-    grid[0][0] = 0
-    grid[-1][-1] = 0
+    #grid[0][0] = 0
+    #grid[-1][-1] = 0
     return grid
 
 # Calculates h(x) using one of a range of heuristics
@@ -27,12 +27,7 @@ class Cell:
         self.neighbors=[]
         self.visited=False
         self.blocked=9999
-        self.c=9999
-        self.b=9999
-        self.e=9999
-        self.h=9999
-        self.n=len(self.neighbors)
-
+        self.terrian=9999
     def getPos(self):
         return self.col, self.row
     #return a list of neighbors of the current cell
@@ -46,35 +41,12 @@ class Cell:
                                   (x != x2 or y != y2) and
                                   (0 <= x2 < dim) and
                                   (0 <= y2 < dim))]
-        return neighbors
-    #sense the neigbhors, update current cell's info
-    def sensing(self, knowledge):
-        neighbors = knowledge[self.row][self.col].findneighbors()
-        c = 0
-        b = 0
-        e = 0
-        h = 0
-        for cell in neighbors:
-            x, y = cell
-            if grid[y][x] == 1:
-                c += 1
-            if knowledge[y][x].blocked == 1:
-                b += 1
-            if knowledge[y][x].blocked == 0:
-                e += 1
-            if knowledge[y][x].blocked == 9999:
-                h += 1
-        self.c = c
-        self.b = b
-        self.e = e
-        self.h = h
-        self.n = len(neighbors)
-                         
+        return neighbors                    
     def __lt__(self, other):
         return False
 
 #generate knowledge embeded with cell class
-def generate_knowledge(grid):
+def generate_knowledge(grid,revealed = False):
     cell_list = []
     rows = len(grid)
     cols = len(grid[0])
@@ -82,7 +54,8 @@ def generate_knowledge(grid):
         cell_list.append([])
         for j in range(cols):
             cellOBJ = Cell(i,j,rows)
-            #cellOBJ.blocked = grid[i][j]
+            if revealed:
+                cellOBJ.blocked = grid[i][j]
             cell_list[i].append(cellOBJ)
     return cell_list
 
@@ -161,7 +134,7 @@ def algorithmA(grid, start, end, has_four_way_vision):
     curr_knowledge = generate_knowledge(grid)
     # If the grid is considered known to the robot, operate on that known grid
 	# Else, the robot assumes a completely unblocked gridworld and will have to discover it as it moves
-    complete_path = [(0,0)]
+    complete_path = [start]
 	# Run A* once on grid as known, returning False if unsolvable
     shortest_path = A_star(curr_knowledge, start, end)
     if not shortest_path:
@@ -204,10 +177,28 @@ def algorithmA(grid, start, end, has_four_way_vision):
         is_broken = False
     return [complete_path, cell_count]
 
-grid = generate_gridworld(101,101,.3)
-start = (0,0)
-end = (100,100)
-print("Agent 1")
-agent1 = algorithmA(grid, start, end, has_four_way_vision = False)
-print("Agent 2")
-agent2 = algorithmA(grid, start, end, has_four_way_vision = True)
+"""generate grid with terrians
+1:blocked, 2:flat, 3:hill, 4:forest,
+5:flat with target, 6:hill with target, 7:forest with target"""
+def generate_terrain(dim):
+    initial_grid = generate_gridworld(dim,dim,.3)
+    solvable = False
+    while not solvable:
+        x1, y1, x2, y2 = np.random.choice(dim,4)        
+        while initial_grid[y1][x1] == 1 or initial_grid[y2][x2] == 1:
+            x1, y1, x2, y2 = np.random.choice(dim,4)
+        start = (x1,y1)
+        end = (x2,y2)
+        curr_knowledge = generate_knowledge(initial_grid,revealed = True)
+        solvable = A_star(curr_knowledge, start, end)
+    initial_grid[y1][x1] = np.random.choice([2,3,4],1)
+    initial_grid[y2][x2] = np.random.choice([5,6,7],1)
+    g_index = np.where(initial_grid ==0)
+    initial_grid[g_index] = np.random.choice([2,3,4],len(g_index[0]))
+    print([start,end])    
+    print(solvable[0])
+    return initial_grid, start
+
+#test    
+grid, start = generate_terrain(11)
+
