@@ -213,6 +213,7 @@ def find_max_prob(curr_knowledge,curr_pos):
     dim = len(curr_knowledge)
     max_prob = 0
     candidate = []
+    end = curr_pos
     for y in range(dim):
         for x in range(dim):
             if curr_knowledge[y][x].prob_containing > max_prob:
@@ -303,9 +304,17 @@ def agent_6(grid, start):
     # The agent finds the optimal square to plan toward until it finds the target
     while not found_target:
         # Calculate the most likely square to contain the target, with ties broken by distance and random selection
-        end = find_max_prob(curr_knowledge,curr_pos,end)
+        end = find_max_prob(curr_knowledge,curr_pos)
         shortest_path = A_star(curr_knowledge, curr_pos, end)
         print("curr_pos is {}, end is {}".format(curr_pos, end))
+        if not shortest_path:
+            n = len(curr_knowledge)**2
+            x,y = end
+            curr_knowledge[y][x].prob_containing = 0
+            for row in curr_knowledge:
+                for cell in row:
+                    cell.prob_containing /= (1 - (1 / n))
+            continue
         #print(shortest_path)
 		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
         for cell in shortest_path[0]:
