@@ -28,6 +28,7 @@ class Cell:
         self.visited=False
         self.blocked=9999
         self.terrian=9999
+        self.prob= 1/(dim*dim)
     def getPos(self):
         return self.col, self.row
     #return a list of neighbors of the current cell
@@ -50,12 +51,16 @@ def generate_knowledge(grid,revealed = False):
     cell_list = []
     rows = len(grid)
     cols = len(grid[0])
+    #calculate initial_prob of each cell
+    g_index = np.where(grid !=1)
+    initial_prob = 1/len(g_index[0])
     for i in range(rows):
         cell_list.append([])
         for j in range(cols):
             cellOBJ = Cell(i,j,rows)
             if revealed:
-                cellOBJ.blocked = grid[i][j]
+                cellOBJ.blocked = grid[i][j] 
+            cellOBJ.prob= initial_prob
             cell_list[i].append(cellOBJ)
     return cell_list
 
@@ -132,6 +137,7 @@ def A_star(curr_knowledge, start, end):
 def algorithmA(grid, start, end, has_four_way_vision):
     # The assumed state of the gridworld at any point in time. For some questions, the current knowledge is unknown at the start
     curr_knowledge = generate_knowledge(grid)
+    prob_table = generate_prob_table(grid)
     # If the grid is considered known to the robot, operate on that known grid
 	# Else, the robot assumes a completely unblocked gridworld and will have to discover it as it moves
     complete_path = [start]
@@ -177,7 +183,7 @@ def algorithmA(grid, start, end, has_four_way_vision):
         is_broken = False
     return [complete_path, cell_count]
 
-"""generate grid with terrians
+"""generate grid with terrains
 1:blocked, 2:flat, 3:hill, 4:forest,
 5:flat with target, 6:hill with target, 7:forest with target"""
 def generate_terrain(dim):
@@ -198,7 +204,28 @@ def generate_terrain(dim):
     print([start,end])    
     print(solvable[0])
     return initial_grid, start
+    
+def find_max_prob(curr_knowledge,curr_sq,end):
+    dim = len(curr_knowledge)
+    max_prob = 0
+    for y in range(dim):
+        for x in range(dim):
+            if curr_knowledge[y][x].prob > max_prob:
+                max_prob = curr_knowledge[y][x].prob
+                end = (x,y)
+            #if probability same, then compare their distance
+            elif curr_knowledge[y][x].prob == max_prob:
+                if hureisticValue(curr_sq,(x,y)) < hureisticValue(curr_sq,end):
+                    end = (x,y)
+                #if distance same, then random choice
+                elif hureisticValue(curr_sq,(x,y)) == hureisticValue(curr_sq,end) and np.random.choice([0,2]) > 1:
+                    end = (x,y)
+    return end
 
 #test    
-grid, start = generate_terrain(11)
-
+grid, start = generate_terrain(5)
+print("Full grid:")
+print(grid)
+print("Start: ")
+print(start)
+agent_6(grid, start)
