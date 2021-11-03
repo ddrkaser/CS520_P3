@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from math import sqrt
 from queue import PriorityQueue
-import matplotlib.pyplot as plt 
+#import matplotlib.pyplot as plt 
 import time
 
 def generate_gridworld(length, width, probability):
@@ -27,7 +27,10 @@ class Cell:
         self.neighbors=[]
         self.visited=False
         self.blocked=9999
-        self.terrian=9999
+        self.terrain=9999
+        self.prob_containing = 1 / (dim**2)
+        self.prob_finding = (.5 * self.prob_containing + .8 * self.prob_containing + .2 * self.prob_containing) / 3
+		
     def getPos(self):
         return self.col, self.row
     #return a list of neighbors of the current cell
@@ -199,6 +202,104 @@ def generate_terrain(dim):
     print(solvable[0])
     return initial_grid, start
 
-#test    
-grid, start = generate_terrain(11)
+def examine_sq(cell, grid):
+    x, y = cell
+    cell_type = grid[y][x]
+    # The presence of the target is determined.
+    # The agent is not aware of this
+    contains_target = (lambda type: True if type >= 5 else False)(cell_type)
+    found_target = False
+    # Depending on our knowledge of the grid, the possibility of a false negative must be simulated
+    if cell_type == 5:
+        found_target = np.random.random() < .8
+    elif cell_type == 6:
+        found_target = np.random.random() < .5
+    elif cell_type == 7:
+        found_target = np.random.random() < .2
+    return found_target, contains_target
+	
+def update_containing_probs(curr_knowledge, grid, curr_cell, cell_type):
+    n = len(curr_knowledge)**2
+    x, y = curr_cell
+    # If the discovered cell is blocked, that cell clearly cannot contain the target,
+    # and the remaining cells now become slightly more likely to contain it
+    if cell_type == 1:
+        for row in curr_knowledge:
+            for cell in row:
+                cell.prob_containing /= (1 - (1 / n))
+        curr_knowledge[y][x].prob_containing = 0
+        curr_knowledge[y][x].blocked = True
+    # The cell MAY contain the target
+    else:
+        # The agent examines the square to see if the target is present
+        found_target, contains_target = examine_sq(curr_cell, grid)
+		# There are no false positives, so the agent found the target
+        if found_target:
+            for row in curr_knowledge:
+                for cell in row:
+                    cell.prob_containing = 0
+            curr_knowledge[y][x].prob_containing = 1
+            return "found"
+        else:
+            # The agent did not find the target, so because of the possibility of false negatives,
+			# probabilities for all squares must be adjusted accordingly
+            if cell_type == 2 or cell_type == 5:
+                prob = curr_knowledge[y][x].prob_containing
+                for row in curr_knowledge:
+                    for cell in row:
+                        if cell != curr_knowledge[y][x]:
+                            cell.prob_containing /= .2 * prob + (1 - prob)
+                curr_knowledge[y][x].prob_containing = .2 * prob / (.2 * prob + (1 - prob))
+            elif cell_type == 3 or cell_type == 6:
+                prob = curr_knowledge[y][x].prob_containing
+                for row in curr_knowledge:
+                    for cell in row:
+                        if cell != curr_cell:
+                            cell.prob_containing /= .5 * prob + (1 - prob)
+                curr_knowledge[y][x].prob_containing = .5 * prob / (.5 * prob + (1 - prob))
+            else:
+                prob = curr_knowledge[y][x].prob_containing
+                for row in curr_knowledge:
+                    for cell in row:
+                        if cell != curr_cell:
+                            cell.prob_containing /= .8 * prob + (1 - prob)
+                curr_knowledge[y][x].prob_containing = .8 * prob / (.8 * prob + (1 - prob))
 
+    return curr_knowledge
+            
+def agent_6(grid, start):
+    curr_knowledge = generate_knowledge(grid)
+    found_target = False
+    curr_pos = (start[0], start[1])
+    # The agent finds the optimal square to plan toward until it finds the target
+    while not found_target:
+        # Calculate the most likely square to contain the target, with ties broken by distance and random selection
+        probs = {(cell.prob_containing, cell) for row in curr_knowledge for cell in row}
+        likelihood = max(probs)[0]
+        most_likely = [tup for tup in probs if likelihood == tup[0]]
+        dists = [(hureisticValue(curr_pos, tup[1].getPos()), tup[1]) for tup in most_likely]
+        closest_dist = min(dists)[0]
+        closest = [tup[1] for tup in dists if tup[0] == closest_dist]
+        end = np.random.choice(closest, 1)
+        print(end[0].getPos())
+        shortest_path = A_star(curr_knowledge, curr_pos, end[0].getPos())
+		
+		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
+        for cell in shortest_path[0]:
+            x, y = cell
+            curr_knowledge[y][x].terrain = grid[y][x]
+            curr_knowledge = update_containing_probs(curr_knowledge, grid, cell, grid[y][x])
+            if curr_knowledge == 'found':
+                print("Found target at: (" + str(x) + ", " + str(y) + ")")
+                return cell
+            elif grid[y][x] == 1:
+                curr_pos = prev_cell
+                break
+            prev_cell = cell
+#test    
+grid, start = generate_terrain(5)
+print("Full grid:")
+print(grid)
+print("Start: ")
+print(start)
+agent_6(grid, start)
