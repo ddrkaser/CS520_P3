@@ -6,6 +6,7 @@ from math import sqrt
 from queue import PriorityQueue
 #import matplotlib.pyplot as plt 
 import time
+import random
 
 def generate_gridworld(length, width, probability):
     grid = np.random.choice([0,1], length * width, p = [1 - probability, probability]).reshape(length, width)
@@ -208,21 +209,25 @@ def generate_terrain(dim):
     print(solvable[0])
     return initial_grid, start
     
-def find_max_prob(curr_knowledge,curr_pos,end):
+def find_max_prob(curr_knowledge,curr_pos):
     dim = len(curr_knowledge)
     max_prob = 0
+    candidate = []
     for y in range(dim):
         for x in range(dim):
             if curr_knowledge[y][x].prob_containing > max_prob:
                 max_prob = curr_knowledge[y][x].prob_containing
                 end = (x,y)
+                candidate = [end]
             #if probability same, then compare their distance
             elif curr_knowledge[y][x].prob_containing == max_prob:
                 if hureisticValue(curr_pos,(x,y)) < hureisticValue(curr_pos,end):
                     end = (x,y)
+                    candidate = [end]
                 #if distance same, then random choice
-                elif hureisticValue(curr_pos,(x,y)) == hureisticValue(curr_pos,end) and np.random.choice([0,2]) > 1:
-                    end = (x,y)
+                elif hureisticValue(curr_pos,(x,y)) == hureisticValue(curr_pos,end):
+                    candidate.append((x,y))
+    end = random.sample(candidate,1)[0]
     return end
 
 def examine_sq(cell, grid):
@@ -316,9 +321,10 @@ def agent_6(grid, start):
             prev_cell = cell
 
 #test    
-grid, start = generate_terrain(5)
+grid, start = generate_terrain(11)
 print("Full grid:")
 print(grid)
 print("Start: ")
 print(start)
 agent_6(grid, start)
+
