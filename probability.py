@@ -209,19 +209,23 @@ def generate_terrain(dim):
     print(solvable[0])
     return initial_grid, start
     
-def find_max_prob(curr_knowledge,curr_pos):
+def find_max_prob(curr_knowledge, curr_pos, agent7=False):
     dim = len(curr_knowledge)
     max_prob = 0
     candidate = []
     end = curr_pos
     for y in range(dim):
         for x in range(dim):
-            if curr_knowledge[y][x].prob_containing > max_prob:
-                max_prob = curr_knowledge[y][x].prob_containing
+            prob = curr_knowledge[y][x].prob_containing
+            if agent7:
+                prob = curr_knowledge[y][x].prob_finding
+				
+            if prob > max_prob:
+                max_prob = prob
                 end = (x,y)
                 candidate = [end]
             #if probability same, then compare their distance
-            elif curr_knowledge[y][x].prob_containing == max_prob:
+            elif prob == max_prob:
                 if hureisticValue(curr_pos,(x,y)) < hureisticValue(curr_pos,end):
                     end = (x,y)
                     candidate = [end]
@@ -296,6 +300,25 @@ def update_containing_probs(curr_knowledge, grid, curr_cell, cell_type):
 
     return curr_knowledge
             
+def update_finding_probs(curr_knowledge, grid):
+    dim = len(curr_knowledge)
+    for y in range(dim):
+        for x in range(dim):
+            # The square has flat terrain
+            if grid[y][x] == 2 or grid[y][x] == 5:
+                curr_knowledge[y][x].prob_finding = .8 * curr_knowledge[y][x].prob_containing
+            # The square has hilly terrain
+            elif grid[y][x] == 3 or grid[y][x] == 6:
+                curr_knowledge[y][x].prob_finding = .5 * curr_knowledge[y][x].prob_containing
+	        # The square has forest terrain
+            elif grid[y][x] == 4 or grid[y][x] == 7:
+                curr_knowledge[y][x].prob_finding = .2 * curr_knowledge[y][x].prob_containing
+            # The square has never been visited, but because the probability it contains the target may have changed,
+            # The probability the agent can find it must too
+            else:
+                curr_knowledge[y][x].prob_finding = (.8 * curr_knowledge[y][x].prob_containing + .5 * curr_knowledge[y][x].prob_containing + .2 * curr_knowledge[y][x].prob_containing) / 3
+    return curr_knowledge
+	
 def agent_6(grid, start):
     curr_knowledge = generate_knowledge(grid)
     found_target = False
@@ -311,9 +334,7 @@ def agent_6(grid, start):
             n = len(curr_knowledge)**2
             x,y = end
             curr_knowledge[y][x].prob_containing = 0
-            for row in curr_knowledge:
-                for cell in row:
-                    cell.prob_containing /= (1 - (1 / n))
+            curr_knowledge = update_containing_probs(curr_knowledge, grid, end, grid[y][x])
             continue
         #print(shortest_path)
 		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
@@ -327,8 +348,49 @@ def agent_6(grid, start):
             elif grid[y][x] == 1:
                 curr_pos = prev_cell
                 break
+            new_end = find_max_prob(curr_knowledge, curr_pos)
+            if new_end != end:
+                curr_pos = cell
+                break
             prev_cell = cell
 
+def agent_7(grid, start):
+    curr_knowledge = generate_knowledge(grid)
+    found_target = False
+    curr_pos = start
+    end = start
+    # The agent finds the optimal square to plan toward until it finds the target
+    while not found_target:
+        # Calculate the most likely square to contain the target, with ties broken by distance and random selection
+        end = find_max_prob(curr_knowledge, curr_pos, True)
+        shortest_path = A_star(curr_knowledge, curr_pos, end)
+        print("curr_pos is {}, end is {}".format(curr_pos, end))
+        if not shortest_path:
+            n = len(curr_knowledge)**2
+            x,y = end
+            curr_knowledge[y][x].prob_containing = 0
+            curr_knowledge = update_containing_probs(curr_knowledge, grid, end, grid[y][x])
+            curr_knowledge = update_finding_probs(curr_knowledge, grid)
+            continue
+        #print(shortest_path)
+		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
+        for cell in shortest_path[0]:
+            x, y = cell
+            curr_knowledge[y][x].terrain = grid[y][x]
+            curr_knowledge = update_containing_probs(curr_knowledge, grid, cell, grid[y][x])
+            if curr_knowledge == 'found':
+                print("Found target at: ({}, {})".format(x,y))
+                return cell
+            elif grid[y][x] == 1:
+                curr_pos = prev_cell
+                break
+            curr_knowledge = update_finding_probs(curr_knowledge, grid)
+            new_end = find_max_prob(curr_knowledge, curr_pos, True)
+            if new_end != end:
+                curr_pos = cell
+                break
+            prev_cell = cell
+	
 #test    
 grid, start = generate_terrain(11)
 print("Full grid:")
@@ -336,4 +398,4 @@ print(grid)
 print("Start: ")
 print(start)
 agent_6(grid, start)
-
+agent_7(grid, start)
