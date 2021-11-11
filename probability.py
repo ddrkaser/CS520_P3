@@ -305,13 +305,13 @@ def update_finding_probs(curr_knowledge, grid):
     for y in range(dim):
         for x in range(dim):
             # The square has flat terrain
-            if grid[y][x] == 2 or grid[y][x] == 5:
+            if curr_knowledge[y][x] == 2 or curr_knowledge[y][x] == 5:
                 curr_knowledge[y][x].prob_finding = .8 * curr_knowledge[y][x].prob_containing
             # The square has hilly terrain
-            elif grid[y][x] == 3 or grid[y][x] == 6:
+            elif curr_knowledge[y][x] == 3 or curr_knowledge[y][x] == 6:
                 curr_knowledge[y][x].prob_finding = .5 * curr_knowledge[y][x].prob_containing
 	        # The square has forest terrain
-            elif grid[y][x] == 4 or grid[y][x] == 7:
+            elif curr_knowledge[y][x] == 4 or curr_knowledge[y][x] == 7:
                 curr_knowledge[y][x].prob_finding = .2 * curr_knowledge[y][x].prob_containing
             # The square has never been visited, but because the probability it contains the target may have changed,
             # The probability the agent can find it must too
@@ -334,7 +334,9 @@ def agent_6(grid, start):
             n = len(curr_knowledge)**2
             x,y = end
             curr_knowledge[y][x].prob_containing = 0
-            curr_knowledge = update_containing_probs(curr_knowledge, grid, end, grid[y][x])
+            for row in curr_knowledge:
+                for cell in row:
+                    cell.prob_containing /= (1 - (1 / n))
             continue
         #print(shortest_path)
 		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
@@ -369,8 +371,9 @@ def agent_7(grid, start):
             n = len(curr_knowledge)**2
             x,y = end
             curr_knowledge[y][x].prob_containing = 0
-            curr_knowledge = update_containing_probs(curr_knowledge, grid, end, grid[y][x])
-            curr_knowledge = update_finding_probs(curr_knowledge, grid)
+            for row in curr_knowledge:
+                for cell in row:
+                    cell.prob_containing /= (1 - (1 / n))
             continue
         #print(shortest_path)
 		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
