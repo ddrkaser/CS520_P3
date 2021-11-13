@@ -356,7 +356,7 @@ def agent_6(grid, start):
             exam_count += 1
             if curr_knowledge == 'found':
                 print("Found target at: ({}, {})".format(x,y))
-                return cell
+                return [cell, move_count, exam_count, move_count + exam_count]
             elif grid[y][x] == 1:
                 curr_pos = prev_cell
                 break
@@ -397,7 +397,7 @@ def agent_7(grid, start):
             exam_count += 1
             if curr_knowledge == 'found':
                 print("Found target at: ({}, {})".format(x,y))
-                return cell
+                return [cell, move_count, exam_count, move_count + exam_count]
             elif grid[y][x] == 1:
                 curr_pos = prev_cell
                 break
