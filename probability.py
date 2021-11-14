@@ -282,12 +282,13 @@ def examine_sq(cell, grid):
 def update_containing_probs(curr_knowledge, grid, curr_cell, cell_type):
     n = len(curr_knowledge)**2
     x, y = curr_cell
+    prob = curr_knowledge[y][x].prob_containing
     # If the discovered cell is blocked, that cell clearly cannot contain the target,
     # and the remaining cells now become slightly more likely to contain it
     if cell_type == 1:
         for row in curr_knowledge:
             for cell in row:
-                cell.prob_containing /= (1 - (1 / n))
+                cell.prob_containing /= (1 - prob)
         curr_knowledge[y][x].prob_containing = 0
         curr_knowledge[y][x].blocked = 1
     # The cell MAY contain the target
@@ -306,21 +307,18 @@ def update_containing_probs(curr_knowledge, grid, curr_cell, cell_type):
             # The agent did not find the target, so because of the possibility of false negatives,
 			# probabilities for all squares must be adjusted accordingly
             if cell_type == 2 or cell_type == 5:
-                prob = curr_knowledge[y][x].prob_containing
                 for row in curr_knowledge:
                     for cell in row:
                         if cell != curr_knowledge[y][x]:
                             cell.prob_containing /= .2 * prob + (1 - prob)
                 curr_knowledge[y][x].prob_containing = .2 * prob / (.2 * prob + (1 - prob))
             elif cell_type == 3 or cell_type == 6:
-                prob = curr_knowledge[y][x].prob_containing
                 for row in curr_knowledge:
                     for cell in row:
                         if cell != curr_cell:
                             cell.prob_containing /= .5 * prob + (1 - prob)
                 curr_knowledge[y][x].prob_containing = .5 * prob / (.5 * prob + (1 - prob))
             else:
-                prob = curr_knowledge[y][x].prob_containing
                 for row in curr_knowledge:
                     for cell in row:
                         if cell != curr_cell:
