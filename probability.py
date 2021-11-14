@@ -28,6 +28,11 @@ class Cell:
         self.neighbors=[]
         self.visited=False
         self.blocked=9999
+        self.b=0
+        self.e=0
+        self.h=0
+        self.area_prob = 0
+        self.n=len(self.neighbors)
         self.terrain=9999
         self.prob_containing = 1 / (dim**2)
         self.prob_finding = (.5 * self.prob_containing + .8 * self.prob_containing + .2 * self.prob_containing) / 3
@@ -46,7 +51,29 @@ class Cell:
                                   (x != x2 or y != y2) and
                                   (0 <= x2 < dim) and
                                   (0 <= y2 < dim))]
-        return neighbors                    
+        return neighbors
+    
+    def sensing(self, knowledge):
+        neighbors = knowledge[self.row][self.col].findneighbors()
+        b = 0
+        e = 0
+        h = 0
+        area_prob = self.prob_finding*1000000
+        for cell in neighbors:
+            x, y = cell
+            if knowledge[y][x].blocked == 1:
+                b += 1
+            if knowledge[y][x].blocked == 0:
+                e += 1
+            if knowledge[y][x].blocked == 9999:
+                h += 1
+            area_prob += knowledge[y][x].prob_finding*1000000/160
+        self.b = b
+        self.e = e
+        self.h = h
+        self.n = len(neighbors)
+        self.area_prob = area_prob
+                  
     def __lt__(self, other):
         return False
 
@@ -359,9 +386,10 @@ def agent_6(grid, start):
                 return [cell, move_count, exam_count, move_count + exam_count]
             elif grid[y][x] == 1:
                 curr_pos = prev_cell
+                exam_count -= 1
                 break
             new_end = find_max_prob(curr_knowledge, curr_pos)
-            if new_end != end:
+            if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_containing > curr_knowledge[end[1]][end[0]].prob_containing:
                 curr_pos = cell
                 break
             prev_cell = cell
@@ -400,19 +428,97 @@ def agent_7(grid, start):
                 return [cell, move_count, exam_count, move_count + exam_count]
             elif grid[y][x] == 1:
                 curr_pos = prev_cell
+                exam_count -= 1
                 break
             curr_knowledge = update_finding_probs(curr_knowledge)
             new_end = find_max_prob(curr_knowledge, curr_pos, True)
-            if new_end != end:
+            if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_finding > curr_knowledge[end[1]][end[0]].prob_finding:
                 curr_pos = cell
                 break
             prev_cell = cell
-	
+            
+def agent_8(grid, start, penalty):
+    curr_knowledge = generate_knowledge(grid)
+    found_target = False
+    curr_pos = start
+    end = start
+    exam_count = 0
+    move_count = 0
+    # The agent finds the optimal square to plan toward until it finds the target
+    while not found_target:
+        # Calculate the most likely square to contain the target, with ties broken by distance and random selection
+        end = find_optimal_end(curr_knowledge, curr_pos, penalty)
+        shortest_path = A_star(curr_knowledge, curr_pos, end)
+        print("curr_pos is {}, end is {}".format(curr_pos, end))
+        #the end is unreachable, update curr_knowledge;
+        if not shortest_path:
+            n = len(curr_knowledge)**2
+            x,y = end
+            curr_knowledge[y][x].prob_containing = 0
+            curr_knowledge[y][x].prob_finding = 0
+            curr_knowledge = update_finding_probs(curr_knowledge, unreachable=True)
+            continue
+        #print(shortest_path)
+		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
+        for cell in shortest_path[0]:
+            move_count += 1
+            x, y = cell
+            curr_knowledge[y][x].terrain = grid[y][x]
+            curr_knowledge = update_containing_probs(curr_knowledge, grid, cell, grid[y][x])
+            exam_count += 1
+            if curr_knowledge == 'found':
+                print("Found target at: ({}, {})".format(x,y))
+                return [cell, move_count, exam_count, move_count + exam_count]
+            elif grid[y][x] == 1:
+                curr_pos = prev_cell
+                exam_count -= 1
+                break
+            curr_knowledge = update_finding_probs(curr_knowledge)
+            new_end = find_optimal_end(curr_knowledge, curr_pos, penalty)
+            if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_finding > curr_knowledge[end[1]][end[0]].prob_finding:
+                curr_pos = cell
+                break
+            prev_cell = cell
+        
+
+def find_optimal_end(curr_knowledge, curr_pos, penalty):
+    dim = len(curr_knowledge)
+    end = curr_pos
+    max_utility = -100
+    candidate = []
+    sc_prob = 0
+    fc_prob = 0
+    for y in range(dim):
+        for x in range(dim):
+            curr_knowledge[y][x].sensing(curr_knowledge)
+            prob = curr_knowledge[y][x].area_prob
+            dist = hureisticValue(curr_pos,(x,y))
+            utility = penalty*dist + prob
+            #print(utility, penalty*dist, prob)
+            #if find max probability, put it as candidate
+            if utility > max_utility:
+                sc_prob = fc_prob
+                fc_prob = prob
+                real_penalty = penalty*dist
+                max_utility = utility
+                end = (x,y)
+                candidate = [end]
+            #if probability same, then compare their distance
+            elif utility == max_utility:
+                candidate.append((x,y))
+    print(fc_prob,sc_prob,fc_prob-sc_prob, real_penalty)
+   #print(candidate)
+    #print(candidate)
+    end = random.sample(candidate,1)[0]
+    return end
+    
 #test    
-grid, start = generate_terrain(11)
+grid, start = generate_terrain(101)
 print("Full grid:")
 print(grid)
 print("Start: ")
 print(start)
 agent_6(grid, start)
 agent_7(grid, start)
+agent_8(grid, start, -70/200)
+
