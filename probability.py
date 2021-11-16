@@ -7,6 +7,7 @@ from queue import PriorityQueue
 #import matplotlib.pyplot as plt 
 import time
 import random
+import matplotlib.pyplot as plt 
 
 def generate_gridworld(length, width, probability):
     grid = np.random.choice([0,1], length * width, p = [1 - probability, probability]).reshape(length, width)
@@ -58,21 +59,21 @@ class Cell:
         b = 0
         e = 0
         h = 0
-        area_prob = self.prob_finding*1000000
+        #area_prob = self.prob_finding
         for cell in neighbors:
             x, y = cell
             if knowledge[y][x].blocked == 1:
                 b += 1
-            if knowledge[y][x].blocked == 0:
+            elif knowledge[y][x].blocked == 0:
                 e += 1
-            if knowledge[y][x].blocked == 9999:
+            elif knowledge[y][x].blocked == 9999:
                 h += 1
-            area_prob += knowledge[y][x].prob_finding*1000000/160
+            #area_prob += knowledge[y][x].prob_finding
         self.b = b
         self.e = e
         self.h = h
         self.n = len(neighbors)
-        self.area_prob = area_prob
+        #self.area_prob = area_prob/(len(neighbors)+1)
                   
     def __lt__(self, other):
         return False
@@ -163,56 +164,6 @@ def A_star(curr_knowledge, start, end):
 		# if priority queue is empty at any point, then unsolvable
         if pq.empty():
             return False
-
-# Handles processing of Repeated A*, restarting that algorithm if a blocked square is found in the determined shortest path
-def algorithmA(grid, start, end, has_four_way_vision):
-    # The assumed state of the gridworld at any point in time. For some questions, the current knowledge is unknown at the start
-    curr_knowledge = generate_knowledge(grid)
-    prob_table = generate_prob_table(grid)
-    # If the grid is considered known to the robot, operate on that known grid
-	# Else, the robot assumes a completely unblocked gridworld and will have to discover it as it moves
-    complete_path = [start]
-	# Run A* once on grid as known, returning False if unsolvable
-    shortest_path = A_star(curr_knowledge, start, end)
-    if not shortest_path:
-        return False
-    is_broken = False
-    cell_count = shortest_path[1]
-    while True:
-		# Move pointer square by square along path
-        for sq in shortest_path[0]:
-            x = sq[0]
-            y = sq[1]
-			# If blocked, rerun A* and restart loop
-            if grid[y][x] == 1:
-                # If the robot can only see squares in its direction of movement, update its current knowledge of the grid to include this blocked square
-                if not has_four_way_vision:
-                    curr_knowledge[y][x].blocked = 1
-                shortest_path = A_star(curr_knowledge, prev_sq, end)                
-                if not shortest_path:
-                    return False
-                is_broken = True
-                cell_count += shortest_path[1]
-                break
-			# If new square unblocked, update curr_knowledge. Loop will restart and move to next square on presumed shortest path
-            else:
-                if sq != complete_path[-1]:
-                    complete_path.append(sq)
-                # If the robot can see in all compass directions, update squares adjacent to its current position
-                if has_four_way_vision:
-                     if x != 0:
-                         curr_knowledge[y][x - 1].blocked = grid[y][x - 1]
-                     if x < len(curr_knowledge[0]) - 1:
-                         curr_knowledge[y][x + 1].blocked = grid[y][x + 1]
-                     if y != 0:
-                         curr_knowledge[y - 1][x].blocked = grid[y - 1][x]
-                     if y < len(curr_knowledge) - 1:
-                         curr_knowledge[y + 1][x].blocked = grid[y + 1][x]
-            prev_sq = sq
-        if not is_broken:
-            break
-        is_broken = False
-    return [complete_path, cell_count]
 
 """generate grid with terrains
 1:blocked, 2:flat, 3:hill, 4:forest,
@@ -361,7 +312,7 @@ def agent_6(grid, start):
         # Calculate the most likely square to contain the target, with ties broken by distance and random selection
         end = find_max_prob(curr_knowledge,curr_pos)
         shortest_path = A_star(curr_knowledge, curr_pos, end)
-        print("curr_pos is {}, end is {}".format(curr_pos, end))
+        #print("curr_pos is {}, end is {}".format(curr_pos, end))
         #the end is unreachable, update curr_knowledge;
         if not shortest_path:
             n = len(curr_knowledge)**2
@@ -404,7 +355,7 @@ def agent_7(grid, start):
         # Calculate the most likely square to contain the target, with ties broken by distance and random selection
         end = find_max_prob(curr_knowledge, curr_pos, True)
         shortest_path = A_star(curr_knowledge, curr_pos, end)
-        print("curr_pos is {}, end is {}".format(curr_pos, end))
+        #print("curr_pos is {}, end is {}".format(curr_pos, end))
         #the end is unreachable, update curr_knowledge;
         if not shortest_path:
             n = len(curr_knowledge)**2
@@ -435,7 +386,7 @@ def agent_7(grid, start):
                 break
             prev_cell = cell
             
-def agent_8(grid, start, penalty):
+def agent_8(grid, start):
     curr_knowledge = generate_knowledge(grid)
     found_target = False
     curr_pos = start
@@ -445,9 +396,9 @@ def agent_8(grid, start, penalty):
     # The agent finds the optimal square to plan toward until it finds the target
     while not found_target:
         # Calculate the most likely square to contain the target, with ties broken by distance and random selection
-        end = find_optimal_end(curr_knowledge, curr_pos, penalty)
+        end = find_optimal_end(curr_knowledge, curr_pos)
         shortest_path = A_star(curr_knowledge, curr_pos, end)
-        print("curr_pos is {}, end is {}".format(curr_pos, end))
+        #print("curr_pos is {}, end is {}".format(curr_pos, end))
         #the end is unreachable, update curr_knowledge;
         if not shortest_path:
             n = len(curr_knowledge)**2
@@ -472,51 +423,76 @@ def agent_8(grid, start, penalty):
                 exam_count -= 1
                 break
             curr_knowledge = update_finding_probs(curr_knowledge)
-            new_end = find_optimal_end(curr_knowledge, curr_pos, penalty)
+            new_end = find_optimal_end(curr_knowledge, curr_pos)
             if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_finding > curr_knowledge[end[1]][end[0]].prob_finding:
                 curr_pos = cell
                 break
             prev_cell = cell
         
-
-def find_optimal_end(curr_knowledge, curr_pos, penalty):
+#find end with max probability, tie break uses utility, which compute the weighted distance and blocks around the target cell.
+def find_optimal_end(curr_knowledge, curr_pos):
     dim = len(curr_knowledge)
     end = curr_pos
-    max_utility = -100
+    max_prob = 0
+    max_utility = 0
     candidate = []
-    sc_prob = 0
-    fc_prob = 0
     for y in range(dim):
         for x in range(dim):
+            """if curr_knowledge[y][x].prob_containing == 0:
+                continue"""
             curr_knowledge[y][x].sensing(curr_knowledge)
-            prob = curr_knowledge[y][x].area_prob
+            prob = curr_knowledge[y][x].prob_finding
             dist = hureisticValue(curr_pos,(x,y))
-            utility = penalty*dist + prob
-            #print(utility, penalty*dist, prob)
+            #if cell is on the edge, add extra blocks
+            if curr_knowledge[y][x].n == 3:
+                block = curr_knowledge[y][x].b + 5
+            elif curr_knowledge[y][x].n == 5:
+                block = curr_knowledge[y][x].b + 3
+            else:
+                block = curr_knowledge[y][x].b
+            utility = dist//10 + block//2
             #if find max probability, put it as candidate
-            if utility > max_utility:
-                sc_prob = fc_prob
-                fc_prob = prob
-                real_penalty = penalty*dist
+            if prob > max_prob:
+                max_prob = prob
                 max_utility = utility
                 end = (x,y)
                 candidate = [end]
-            #if probability same, then compare their distance
-            elif utility == max_utility:
-                candidate.append((x,y))
-    print(fc_prob,sc_prob,fc_prob-sc_prob, real_penalty)
-   #print(candidate)
+            #if probability same, then compare their utility
+            elif prob == max_prob:
+                if utility < max_utility:
+                    max_utility = utility
+                    end = (x,y)
+                    candidate = [end]
+                elif utility == max_utility:
+                    candidate.append((x,y))
+                #print(max_utility , utility)
     #print(candidate)
     end = random.sample(candidate,1)[0]
     return end
-    
-#test    
-grid, start = generate_terrain(101)
-print("Full grid:")
-print(grid)
-print("Start: ")
-print(start)
-agent_6(grid, start)
-agent_7(grid, start)
-agent_8(grid, start, -70/200)
+
+
+def plot_performence():
+    trails = list(range(20))
+    Agent6 = {trail: 0 for trail in trails}
+    Agent7 = {trail: 0 for trail in trails}
+    Agent8 = {trail: 0 for trail in trails}
+    for trail in trails:
+        print("running trial {}".format(str(trail)))
+        grid, start = generate_terrain(51)
+        Agent6[trail] = agent_6(grid, start)[3]
+        Agent7[trail] = agent_7(grid, start)[3]
+        Agent8[trail] = agent_8(grid, start)[3]
+    ind = np.arange(20)
+    plt.figure(figsize=(12,5))
+    width = 0.3
+    plt.title("Performence by total actions")
+    plt.xlabel("trails")
+    plt.ylabel("total actions")
+    plt.bar(ind - width, Agent6.values() , width, label="Agent6")
+    plt.bar(ind, Agent7.values(), width, label="Agent7")
+    plt.bar(ind + width, Agent8.values(), width, label="Agent8")
+    plt.xticks(ind + width/3, trails)
+    plt.legend(loc='best')
+    plt.show()
+
 
