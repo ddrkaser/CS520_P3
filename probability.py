@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import pandas as pd
-from math import sqrt
 from queue import PriorityQueue
-#import matplotlib.pyplot as plt 
-import time
 import random
 import matplotlib.pyplot as plt 
 
@@ -68,12 +64,10 @@ class Cell:
                 e += 1
             elif knowledge[y][x].blocked == 9999:
                 h += 1
-            #area_prob += knowledge[y][x].prob_finding
         self.b = b
         self.e = e
         self.h = h
         self.n = len(neighbors)
-        #self.area_prob = area_prob/(len(neighbors)+1)
                   
     def __lt__(self, other):
         return False
@@ -190,7 +184,7 @@ def generate_terrain(dim):
 def find_max_prob(curr_knowledge, curr_pos, agent7=False):
     dim = len(curr_knowledge)
     max_prob = 0
-    candidate = []
+    candidate = [curr_pos]
     end = curr_pos
     for y in range(dim):
         for x in range(dim):
@@ -231,7 +225,6 @@ def examine_sq(cell, grid):
     return found_target, contains_target
 	
 def update_containing_probs(curr_knowledge, grid, curr_cell, cell_type):
-    n = len(curr_knowledge)**2
     x, y = curr_cell
     prob = curr_knowledge[y][x].prob_containing
     # If the discovered cell is blocked, that cell clearly cannot contain the target,
@@ -338,6 +331,7 @@ def agent_6(grid, start):
                 exam_count -= 1
                 break
             new_end = find_max_prob(curr_knowledge, curr_pos)
+            #if the agent found a cell with higher prob, replan
             if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_containing > curr_knowledge[end[1]][end[0]].prob_containing:
                 curr_pos = cell
                 break
@@ -381,54 +375,12 @@ def agent_7(grid, start):
                 break
             curr_knowledge = update_finding_probs(curr_knowledge)
             new_end = find_max_prob(curr_knowledge, curr_pos, True)
+            #if the agent found a cell with higher prob, replan
             if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_finding > curr_knowledge[end[1]][end[0]].prob_finding:
                 curr_pos = cell
                 break
             prev_cell = cell
-            
-def agent_8(grid, start):
-    curr_knowledge = generate_knowledge(grid)
-    found_target = False
-    curr_pos = start
-    end = start
-    exam_count = 0
-    move_count = 0
-    # The agent finds the optimal square to plan toward until it finds the target
-    while not found_target:
-        # Calculate the most likely square to contain the target, with ties broken by distance and random selection
-        end = find_optimal_end(curr_knowledge, curr_pos)
-        shortest_path = A_star(curr_knowledge, curr_pos, end)
-        #print("curr_pos is {}, end is {}".format(curr_pos, end))
-        #the end is unreachable, update curr_knowledge;
-        if not shortest_path:
-            n = len(curr_knowledge)**2
-            x,y = end
-            curr_knowledge[y][x].prob_containing = 0
-            curr_knowledge[y][x].prob_finding = 0
-            curr_knowledge = update_finding_probs(curr_knowledge, unreachable=True)
-            continue
-        #print(shortest_path)
-		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
-        for cell in shortest_path[0]:
-            move_count += 1
-            x, y = cell
-            curr_knowledge[y][x].terrain = grid[y][x]
-            curr_knowledge = update_containing_probs(curr_knowledge, grid, cell, grid[y][x])
-            exam_count += 1
-            if curr_knowledge == 'found':
-                print("Found target at: ({}, {})".format(x,y))
-                return [cell, move_count, exam_count, move_count + exam_count]
-            elif grid[y][x] == 1:
-                curr_pos = prev_cell
-                exam_count -= 1
-                break
-            curr_knowledge = update_finding_probs(curr_knowledge)
-            new_end = find_optimal_end(curr_knowledge, curr_pos)
-            if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_finding > curr_knowledge[end[1]][end[0]].prob_finding:
-                curr_pos = cell
-                break
-            prev_cell = cell
-        
+ 
 #find end with max probability, tie break uses utility, which compute the weighted distance and blocks around the target cell.
 def find_optimal_end(curr_knowledge, curr_pos):
     dim = len(curr_knowledge)
@@ -468,8 +420,76 @@ def find_optimal_end(curr_knowledge, curr_pos):
                 #print(max_utility , utility)
     #print(candidate)
     end = random.sample(candidate,1)[0]
-    return end
+    return end            
+ 
+def agent_8(grid, start):
+    curr_knowledge = generate_knowledge(grid)
+    found_target = False
+    curr_pos = start
+    end = start
+    exam_count = 0
+    move_count = 0
+    # The agent finds the optimal square to plan toward until it finds the target
+    while not found_target:
+        # Calculate the most likely square to contain the target, with ties broken by distance and random selection
+        end = find_optimal_end(curr_knowledge, curr_pos)
+        shortest_path = A_star(curr_knowledge, curr_pos, end)
+        #print("curr_pos is {}, end is {}".format(curr_pos, end))
+        #the end is unreachable, update curr_knowledge;
+        if not shortest_path:
+            x,y = end
+            curr_knowledge[y][x].prob_containing = 0
+            curr_knowledge[y][x].prob_finding = 0
+            curr_knowledge = update_finding_probs(curr_knowledge, unreachable=True)
+            continue
+        #print(shortest_path)
+		# Traverse the returned shortest path, sensing squares and updating probabilities as the agent moves
+        for cell in shortest_path[0]:
+            move_count += 1
+            x, y = cell
+            curr_knowledge[y][x].terrain = grid[y][x]
+            curr_knowledge = update_containing_probs(curr_knowledge, grid, cell, grid[y][x])
+            exam_count += 1
+            if curr_knowledge == 'found':
+                print("Found target at: ({}, {})".format(x,y))
+                return [cell, move_count, exam_count, move_count + exam_count]
+            elif grid[y][x] == 1:
+                curr_pos = prev_cell
+                exam_count -= 1
+                break
+            curr_knowledge = update_finding_probs(curr_knowledge)
+            new_end = find_optimal_end(curr_knowledge, curr_pos)
+            ##if the agent found a cell with higher prob, replan
+            if new_end != end and curr_knowledge[new_end[1]][new_end[0]].prob_finding > curr_knowledge[end[1]][end[0]].prob_finding:
+                curr_pos = cell
+                break
+            prev_cell = cell
 
+def plot_move_exam():
+    trails = list(range(20))
+    Agent6_move = {trail: 0 for trail in trails}
+    Agent6_exam = {trail: 0 for trail in trails}
+    Agent7_move = {trail: 0 for trail in trails}
+    Agent7_exam = {trail: 0 for trail in trails}
+    for trail in trails:
+        print("running trial {}".format(str(trail)))
+        grid, start = generate_terrain(51)
+        result_6 = agent_6(grid, start)
+        result_7 = agent_7(grid, start)
+        Agent6_move[trail] = result_6[1]
+        Agent6_exam[trail] = result_6[2]
+        Agent7_move[trail] = result_7[1]
+        Agent7_exam[trail] = result_7[2]
+    plt.title("movement/examinations distribution")
+    plt.xlabel("trails")
+    plt.ylabel("movement/examinations")
+    plt.xticks(trails) 
+    plt.plot(trails, Agent6_move.values(),"b", label="Agent6_move")
+    plt.plot(trails, Agent6_exam.values(),"g", label="Agent6_exam")
+    plt.plot(trails, Agent7_move.values(),"r", label="Agent7_move")
+    plt.plot(trails, Agent7_exam.values(),"y", label="Agent7_exam")
+    plt.legend(loc='best')
+    
 
 def plot_performence():
     trails = list(range(20))
@@ -494,5 +514,6 @@ def plot_performence():
     plt.xticks(ind + width/3, trails)
     plt.legend(loc='best')
     plt.show()
+    
 
 
